@@ -42,7 +42,7 @@ HEADERS = [
     "是否重命名", "是否移动", "处理状态", "说明"
 ]
 
-COLUMN_WIDTHS = [6, 20, 8, 45, 35, 45, 35, 8, 8, 12, 10, 10, 12, 40]
+COLUMN_WIDTHS = [6, 20, 10, 75, 55, 75, 55, 10, 10, 14, 12, 12, 14, 55]
 
 # 状态颜色映射
 STATUS_COLORS = {
@@ -114,6 +114,7 @@ def generate_excel(records: list, show_name: str, output_dir: str = None) -> str
     for row_idx, record in enumerate(records, 2):
         row_data = [record.get(h, "") for h in HEADERS]
         ws.append(row_data)
+        ws.row_dimensions[row_idx].height = 20
 
         status = record.get("处理状态", "")
         fill_color = STATUS_COLORS.get(status)
@@ -131,13 +132,17 @@ def generate_excel(records: list, show_name: str, output_dir: str = None) -> str
     for col_idx, width in enumerate(COLUMN_WIDTHS, 1):
         ws.column_dimensions[get_column_letter(col_idx)].width = width
 
-    # ── 冻结首行 ─────────────────────────────────────────────────────
-    ws.freeze_panes = "A2"
+    # ── 自动筛选 ─────────────────────────────────────────────────────
+    full_range = f"A1:{get_column_letter(len(HEADERS))}{len(records) + 1}"
+    ws.auto_filter.ref = full_range
+
+    # ── 冻结窗格（冻结首行+首列，方便滚动查看） ─────────────────────
+    ws.freeze_panes = "B2"
 
     # ── 统计汇总 Sheet ────────────────────────────────────────────────
     ws_summary = wb.create_sheet("整理统计")
     ws_summary.column_dimensions["A"].width = 20
-    ws_summary.column_dimensions["B"].width = 15
+    ws_summary.column_dimensions["B"].width = 55
 
     total = len(records)
     renamed = sum(1 for r in records if r.get("是否重命名") == "是")
@@ -147,7 +152,7 @@ def generate_excel(records: list, show_name: str, output_dir: str = None) -> str
     conflict = sum(1 for r in records if r.get("处理状态") == "冲突")
 
     summary_data = [
-        ["统计项目", "数量"],
+        ["统计项目", "数值"],
         ["文件总数", total],
         ["已重命名", renamed],
         ["已移动", moved],
@@ -161,8 +166,17 @@ def generate_excel(records: list, show_name: str, output_dir: str = None) -> str
     for row in summary_data:
         ws_summary.append(row)
 
-    ws_summary["A1"].font = Font(name="微软雅黑", bold=True)
-    ws_summary["B1"].font = Font(name="微软雅黑", bold=True)
+    # 统计 Sheet 样式
+    for row_idx in range(1, len(summary_data) + 1):
+        for col_idx in range(1, 3):
+            cell = ws_summary.cell(row=row_idx, column=col_idx)
+            cell.font = Font(name="微软雅黑", size=10, bold=(row_idx == 1))
+            cell.border = thin_border
+            cell.alignment = Alignment(vertical="center")
+            if row_idx == 1:
+                cell.fill = PatternFill("solid", fgColor="1F4E79")
+                cell.font = Font(name="微软雅黑", size=10, bold=True, color="FFFFFF")
+    ws_summary.row_dimensions[1].height = 24
 
     wb.save(filepath)
     print(f"[OK] Excel 已生成：{filepath}")

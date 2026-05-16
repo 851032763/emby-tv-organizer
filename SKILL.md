@@ -99,11 +99,62 @@ Excel 保存路径：<用户指定路径>/电视剧名称_yyyyMMdd_HHmmss.xlsx
 
 ### 阶段五：生成 Excel 对照表
 
-调用 `scripts/generate_excel.py` 生成标准化 Excel 文件。
-- **保存目录**：优先使用用户本次指定的路径；用户未指定时使用默认路径 `/vol2/1000/SyncFile/OpenClawSync`。
-- 文件名格式：`电视剧名称_yyyyMMdd_HHmmss.xlsx`
-- 电视剧名称中的非法文件名字符（`/ \ : * ? " < > |`）须替换为下划线。
-- 调用方式：`python generate_excel.py --data <json_file> --output <保存目录>`
+**⚠️ 关键：必须通过运行 Python 脚本生成 Excel，严禁手动写入 .xlsx 文件内容！**
+
+.xlsx 文件是 ZIP 压缩的 XML 格式，手动写入会生成损坏的文件。必须使用 `generate_excel.py` 脚本通过 openpyxl 库正确生成。
+
+**生成步骤（严格按顺序执行）**：
+
+1. **构造 JSON 数据**：将整理结果组装为如下结构的 JSON：
+   ```json
+   {
+     "show_name": "电视剧名称",
+     "output_dir": "/vol2/1000/SyncFile/OpenClawSync",
+     "records": [
+       {
+         "序号": 1,
+         "电视剧名称": "布鲁伊",
+         "年份": "2018",
+         "原始路径": "/vol3/1000/Movies/TVPlay/[动漫]布鲁伊 1-3季/布鲁伊 S01E01.mkv",
+         "原始文件名": "布鲁伊 S01E01.mkv",
+         "新路径": "/vol3/1000/Movies/TVPlay/布鲁伊 (2018)/Season 01/布鲁伊 (2018) - S01E01.mkv",
+         "新文件名": "布鲁伊 (2018) - S01E01.mkv",
+         "季号": "S01",
+         "集号": "E01",
+         "文件类型": "普通剧集",
+         "是否重命名": "是",
+         "是否移动": "是",
+         "处理状态": "待确认",
+         "说明": ""
+       }
+     ]
+   }
+   ```
+
+2. **写入临时 JSON 文件**：将 JSON 数据保存到临时文件，例如 `/tmp/emby_data_<timestamp>.json`：
+   ```
+   Write tool → file_path: /tmp/emby_data_<timestamp>.json, content: <上述JSON>
+   ```
+
+3. **通过 Bash 运行脚本**：使用 Bash 工具执行 Python 命令：
+   ```bash
+   python "C:/Users/Admin/.workbuddy/skills/emby-tv-organizer/scripts/generate_excel.py" --data /tmp/emby_data_<timestamp>.json --output <保存目录>
+   ```
+
+4. **确认输出**：脚本成功后会打印 `[OK] Excel 已生成：<完整路径>`，将此路径报告给用户。
+
+**脚本路径**：`C:/Users/Admin/.workbuddy/skills/emby-tv-organizer/scripts/generate_excel.py`
+
+**保存目录规则**：
+- 优先使用用户本次指定的路径
+- 用户未指定时使用默认路径 `/vol2/1000/SyncFile/OpenClawSync`
+
+**文件名格式**：`电视剧名称_yyyyMMdd_HHmmss.xlsx`（非法文件名字符自动替换为下划线）
+
+**输出效果**：列宽适配长路径（路径列 75 字符宽），首行+首列冻结，自动筛选，状态颜色标记，统计 Sheet 含边框样式
+
+**❌ 错误做法**：直接用 Write 工具将内容写入 .xlsx 文件（会产生 XML 原文而非有效 Excel）
+**✅ 正确做法**：写 JSON → Bash 运行 Python 脚本 → openpyxl 生成有效 .xlsx
 
 ---
 
